@@ -10,7 +10,7 @@ find_package(CURL REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 
 
-add_executable(my_app src/cli/main.cpp src/http/http_client.cpp)
+add_executable(my_app src/cli/main.cpp src/http/http_client.cpp src/client/client.cpp)
 
 target_link_libraries(my_app PRIVATE CURL::libcurl)
 target_link_libraries(my_app PRIVATE nlohmann_json::nlohmann_json)
