@@ -50,6 +50,7 @@ Client::parseChallenge(const std::string &challenge) const {
   return params;
 }
 
+// TODO: Refactor
 HttpResponse Client::getManifest(std::string image_url) const {
 
   HttpHeaders headers{};
@@ -75,10 +76,31 @@ HttpResponse Client::getManifest(std::string image_url) const {
   auto body_json = nlohmann::json::parse(auth_resp.body);
   auto token = body_json["token"].get<std::string>();
 
+  std::string auth_string = "Bearer " + token;
+
+  Header auth_header = {"Authorization", auth_string};
+
+  headers.add(auth_header);
+
+  resp = hClient_.get(image_url, headers);
+
+  auto manifest_json = nlohmann::json::parse(resp.body);
+
+  std::cout << manifest_json.dump(4) << '\n';
+
+  std::string digest{};
+
+  for (auto man : manifest_json["manifests"]) {
+    auto pl = man["platform"];
+    if (pl["architecture"] == "amd64" && pl["os"] == "linux") {
+      digest = man["digest"];
+      break;
+    }
+  }
+
   // отправил запрос на url1 -> получил из хедеров url2 с адресом для токена
-  // отправил запрос на url2 -> получил из хедеров токен
-  // положил токен в хедер запроса -> отправил запрос на url1
-  // получил манифест
+  // DONE отправил запрос на url2 -> получил из хедеров токен DONE положил
+  // токен в хедер запроса -> отправил запрос на url1 получил манифест
 
   return {};
 }
