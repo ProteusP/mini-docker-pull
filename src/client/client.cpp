@@ -98,9 +98,29 @@ HttpResponse Client::getManifest(std::string image_url) const {
     }
   }
 
+  auto last_slash = image_url.find_last_of('/');
+  auto path = image_url.substr(0, last_slash);
+
+  const auto img_url = path + '/' + digest;
+
+  std::cout << "Image URL: " << img_url << '\n';
+
+  for (auto h : headers.all()) {
+    std::cout << h.first << ": " << h.second << '\n';
+  }
+
+  resp = hClient_.get(img_url, headers);
+
+  auto man_j = nlohmann::json::parse(resp.body);
+
+  std::cout << man_j.dump(4) << '\n';
+
   // отправил запрос на url1 -> получил из хедеров url2 с адресом для токена
   // DONE отправил запрос на url2 -> получил из хедеров токен DONE положил
-  // токен в хедер запроса -> отправил запрос на url1 получил манифест
+  // токен в хедер запроса -> отправил запрос на url1 получил СПИСОК манифестОВ
+  // выбрали нужный манифест, взяли digest -> отправляем запрос на получение
+  // digest`ов blob`сов
+  // -> качаем blobs
 
   return {};
 }
