@@ -1,4 +1,5 @@
 #include "http_client.hpp"
+#include <_stdio.h>
 #include <curl/curl.h>
 #include <curl/easy.h>
 #include <iostream>
@@ -68,7 +69,7 @@ HttpResponse HttpClient::get(std::string url, HttpHeaders headers) {
   CURL *curl = curl_easy_init();
 
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
   auto headers_list = headers.toCurlSlist();
   HttpResponse response{};
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers_list);
@@ -95,7 +96,33 @@ HttpResponse HttpClient::get(std::string url, HttpHeaders headers) {
   return response;
 }
 
-// TODO: Refactor for HEAVY FILES (blobs)
+HttpResponse HttpClient::download(std::string url, HttpHeaders headers,
+                                  std::string write_file) {
+  CURL *curl = curl_easy_init();
+
+  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  auto headers_list = headers.toCurlSlist();
+  HttpResponse response{};
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers_list);
+
+  FILE *fp;
+  fp = std::fopen(write_file.c_str(), "wb");
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+
+  curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, headerCallback);
+  curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response.headers);
+
+  curl_easy_perform(curl);
+
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response.status);
+
+  std::fclose(fp);
+  curl_slist_free_all(headers_list);
+  curl_easy_cleanup(curl);
+  return response;
+}
+
 size_t getCallback(void *data, size_t size, size_t nmemb, void *userdata) {
   size_t bytes = size * nmemb;
   auto out = (std::string *)userdata;

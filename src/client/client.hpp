@@ -1,4 +1,5 @@
 #include "../http/http_client.hpp"
+#include <nlohmann/json.hpp>
 #include <unordered_map>
 #include <vector>
 
@@ -10,7 +11,7 @@ const std::string authHeaderKey = "Authorization";
 
 class Client {
 public:
-  HttpResponse getManifest(std::string image_url);
+  HttpResponse getImage(std::string image_url);
 
   std::unordered_map<std::string, std::string>
   parseChallenge(const std::string &challenge) const;
@@ -28,7 +29,8 @@ private:
     std::string imageURL;
     std::string manifestDigest;
     std::vector<std::string> layersDigests;
-    std::string layersURL;
+    std::string blobsURL;
+    std::string configDigest;
   } pullData;
   HttpClient hClient_;
 
@@ -42,4 +44,20 @@ private:
   std::string getAuthUrl();
 
   void fillManifestDigest();
+
+  nlohmann::json getManifest();
+
+  void downloadBlobs();
+
+  void downloadLayers();
+
+  void downloadConfig();
+
+  void fillBlobsData(nlohmann::json manifest_json);
+
+  void fillBlobsURL();
+
+  std::string getRepoPath();
+
+  void downloadLayer(std::string digest);
 };

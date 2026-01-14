@@ -45,6 +45,8 @@ class HttpClient {
 public:
   static HttpResponse get(std::string url, HttpHeaders headers);
   static HttpResponse head(std::string url, HttpHeaders headers);
+  static HttpResponse download(std::string url, HttpHeaders headers,
+                               std::string write_file);
   // void setAuth();
   // void setTimeout(ms);
 };

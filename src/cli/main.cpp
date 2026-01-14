@@ -9,7 +9,7 @@ int main() {
   Client cl{};
 
   
-  cl.getManifest(url);
+  cl.getImage(url);
 
   std::cout << "\nEND OF PROGRAM!" << std::endl;
 }

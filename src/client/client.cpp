@@ -1,6 +1,5 @@
 #include "client.hpp"
 #include <iostream>
-#include <nlohmann/json.hpp>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -101,23 +100,83 @@ void Client::fillManifestDigest() {
   }
 }
 
-// TODO: Refactor
-HttpResponse Client::getManifest(std::string image_url) {
-  pullData.imageURL = image_url;
+std::string Client::getRepoPath() {
+  auto last_slash = pullData.imageURL.find_last_of('/');
+  auto path_without_ref = pullData.imageURL.substr(0, last_slash);
 
+  auto last_slash_2 = path_without_ref.find_last_of('/');
+  auto repo_path = path_without_ref.substr(0, last_slash_2);
+
+  return repo_path;
+}
+
+void Client::fillBlobsURL() {
+  pullData.blobsURL = getRepoPath() + '/' + "blobs";
+}
+
+void Client::fillBlobsData(nlohmann::json manifest_json) {
+  fillBlobsURL();
+
+  // fill config digest
+  pullData.configDigest = manifest_json["config"]["digest"];
+  // fill layers digests
+  for (auto j : manifest_json["layers"]) {
+    pullData.layersDigests.push_back(j["digest"]);
+  }
+}
+
+void Client::downloadBlobs() {
+
+  downloadConfig();
+
+  downloadLayers();
+}
+
+void Client::downloadLayer(std::string digest) {
+  auto path = pullData.blobsURL + '/' + digest;
+
+  HttpHeaders headers{};
+
+  headers.add({"Accept", "application/vnd.oci.image.layer.v1.tar+gzip"});
+  headers.add({"User-Agent", "my-docker-client/0.1"});
+
+  headers.add(getAuthHeader());
+
+  auto resp = hClient_.download(path, headers, "./" + digest + ".tar.gzip");
+}
+
+void Client::downloadLayers() {
+  for (auto layer_digest : pullData.layersDigests) {
+    downloadLayer(layer_digest);
+  }
+}
+
+void Client::downloadConfig() {
+  auto path = pullData.blobsURL + '/' + pullData.configDigest;
+  HttpHeaders headers{};
+
+  headers.add({"Accept", "application/vnd.oci.image.config.v1+json"});
+  headers.add({"User-Agent", "my-docker-client/0.1"});
+
+  headers.add(getAuthHeader());
+
+  auto resp = hClient_.get(path, headers);
+
+  auto man_j = nlohmann::json::parse(resp.body);
+
+  std::cout << man_j.dump(4) << '\n';
+}
+
+nlohmann::json Client::getManifest() {
   HttpHeaders headers{};
   headers.add(
       {"Accept", "application/vnd.docker.distribution.manifest.v2+json"});
   headers.add({"User-Agent", "my-docker-client/0.1"});
 
-  authenticate();
-
-  fillManifestDigest();
-
   headers.add(getAuthHeader());
 
-  auto last_slash = image_url.find_last_of('/');
-  auto path = image_url.substr(0, last_slash);
+  auto last_slash = pullData.imageURL.find_last_of('/');
+  auto path = pullData.imageURL.substr(0, last_slash);
 
   const auto img_url = path + '/' + pullData.manifestDigest;
 
@@ -126,14 +185,21 @@ HttpResponse Client::getManifest(std::string image_url) {
   auto man_j = nlohmann::json::parse(resp.body);
 
   std::cout << man_j.dump(4) << '\n';
-  std::cout << man_j["layers"] << '\n';
 
-  // отправил запрос на url1 -> получил из хедеров url2 с адресом для токена
-  // DONE отправил запрос на url2 -> получил из хедеров токен DONE положил
-  // токен в хедер запроса -> отправил запрос на url1 получил СПИСОК манифестОВ
-  // выбрали нужный манифест, взяли digest -> отправляем запрос на получение
-  // digest`ов blob`сов
-  // -> качаем blobs
+  return man_j;
+}
+
+// TODO: Refactor
+HttpResponse Client::getImage(std::string image_url) {
+  pullData.imageURL = image_url;
+
+  authenticate();
+
+  fillManifestDigest();
+
+  fillBlobsData(getManifest());
+
+  downloadBlobs();
 
   return {};
 }
