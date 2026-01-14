@@ -36,7 +36,8 @@ Header HttpHeaders::KVToHeader(const std::string &buf) {
   return Header{key, value};
 }
 
-size_t header_cb(char *buffer, size_t size, size_t nitems, void *userdata) {
+size_t headerCallback(char *buffer, size_t size, size_t nitems,
+                      void *userdata) {
 
   std::string KVHeader_str(buffer, nitems);
   if (KVHeader_str.find(':') == std::string::npos) {
@@ -71,10 +72,10 @@ HttpResponse HttpClient::get(std::string url, HttpHeaders headers) {
   auto headers_list = headers.toCurlSlist();
   HttpResponse response{};
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers_list);
-  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, get_cb);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, getCallback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response.body);
 
-  curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_cb);
+  curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, headerCallback);
   curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response.headers);
   // execution ...
   curl_easy_perform(curl);
@@ -95,7 +96,7 @@ HttpResponse HttpClient::get(std::string url, HttpHeaders headers) {
 }
 
 // TODO: Refactor for HEAVY FILES (blobs)
-size_t get_cb(void *data, size_t size, size_t nmemb, void *userdata) {
+size_t getCallback(void *data, size_t size, size_t nmemb, void *userdata) {
   size_t bytes = size * nmemb;
   auto out = (std::string *)userdata;
   out->append((char *)data, bytes);

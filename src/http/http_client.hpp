@@ -49,6 +49,6 @@ public:
   // void setTimeout(ms);
 };
 
-size_t header_cb(char *buffer, size_t size, size_t nitems, void *userdata);
+size_t headerCallback(char *buffer, size_t size, size_t nitems, void *userdata);
 
-size_t get_cb(void *data, size_t size, size_t nmemb, void *userdata);
+size_t getCallback(void *data, size_t size, size_t nmemb, void *userdata);
