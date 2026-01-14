@@ -5,7 +5,7 @@
 
 int main() {
   std::string url =
-      "https://registry-1.docker.io/v2/library/ubuntu/manifests/latest";
+      "https://registry-1.docker.io/v2/library/alpine/manifests/latest";
   Client cl{};
 
   

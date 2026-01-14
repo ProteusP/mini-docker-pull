@@ -50,70 +50,83 @@ Client::parseChallenge(const std::string &challenge) const {
   return params;
 }
 
+std::string Client::getAuthUrl() {
+  HttpHeaders headers{};
+  headers.add(
+      {"Accept", "application/vnd.docker.distribution.manifest.v2+json"});
+  headers.add({"User-Agent", "my-docker-client/0.1"});
+
+  auto resp = hClient_.get(pullData.imageURL, headers);
+
+  auto challenge = getChallengeStr(resp);
+
+  auto challenge_KVS = parseChallenge(challenge);
+
+  return craftAuthUrl(challenge_KVS);
+}
+
+// TODO: add auth errors checks
+void Client::authenticate() {
+  HttpHeaders auth_headers{};
+
+  auth_headers.add({"User-Agent", "my-docker-client/0.1"});
+  auth_headers.add({"Accept", "application/json"});
+
+  auto auth_resp = hClient_.get(getAuthUrl(), auth_headers);
+
+  auto body_json = nlohmann::json::parse(auth_resp.body);
+
+  pullData.authToken = body_json["token"].get<std::string>();
+}
+
+// TODO: add errors checks
+void Client::fillManifestDigest() {
+  HttpHeaders headers{};
+  headers.add(
+      {"Accept", "application/vnd.docker.distribution.manifest.v2+json"});
+  headers.add({"User-Agent", "my-docker-client/0.1"});
+
+  headers.add(getAuthHeader());
+
+  auto resp = hClient_.get(pullData.imageURL, headers);
+
+  auto manifest_json = nlohmann::json::parse(resp.body);
+
+  for (auto man : manifest_json["manifests"]) {
+    auto pl = man["platform"];
+    if (pl["architecture"] == "amd64" && pl["os"] == "linux") {
+      pullData.manifestDigest = man["digest"];
+      break;
+    }
+  }
+}
+
 // TODO: Refactor
-HttpResponse Client::getManifest(std::string image_url) const {
+HttpResponse Client::getManifest(std::string image_url) {
+  pullData.imageURL = image_url;
 
   HttpHeaders headers{};
   headers.add(
       {"Accept", "application/vnd.docker.distribution.manifest.v2+json"});
   headers.add({"User-Agent", "my-docker-client/0.1"});
 
-  auto resp = hClient_.get(image_url, headers);
+  authenticate();
 
-  auto challenge = getChallengeStr(resp);
+  fillManifestDigest();
 
-  auto challenge_KVS = parseChallenge(challenge);
-
-  auto auth_url = craftAuthUrl(challenge_KVS);
-
-  HttpHeaders auth_headers{};
-
-  auth_headers.add({"User-Agent", "my-docker-client/0.1"});
-  auth_headers.add({"Accept", "application/json"});
-
-  auto auth_resp = hClient_.get(auth_url, auth_headers);
-
-  auto body_json = nlohmann::json::parse(auth_resp.body);
-  auto token = body_json["token"].get<std::string>();
-
-  std::string auth_string = "Bearer " + token;
-
-  Header auth_header = {"Authorization", auth_string};
-
-  headers.add(auth_header);
-
-  resp = hClient_.get(image_url, headers);
-
-  auto manifest_json = nlohmann::json::parse(resp.body);
-
-  std::cout << manifest_json.dump(4) << '\n';
-
-  std::string digest{};
-
-  for (auto man : manifest_json["manifests"]) {
-    auto pl = man["platform"];
-    if (pl["architecture"] == "amd64" && pl["os"] == "linux") {
-      digest = man["digest"];
-      break;
-    }
-  }
+  headers.add(getAuthHeader());
 
   auto last_slash = image_url.find_last_of('/');
   auto path = image_url.substr(0, last_slash);
 
-  const auto img_url = path + '/' + digest;
+  const auto img_url = path + '/' + pullData.manifestDigest;
 
-  std::cout << "Image URL: " << img_url << '\n';
-
-  for (auto h : headers.all()) {
-    std::cout << h.first << ": " << h.second << '\n';
-  }
-
-  resp = hClient_.get(img_url, headers);
+  auto resp = hClient_.get(img_url, headers);
 
   auto man_j = nlohmann::json::parse(resp.body);
 
   std::cout << man_j.dump(4) << '\n';
+  std::cout << man_j["layers"] << '\n';
 
   // отправил запрос на url1 -> получил из хедеров url2 с адресом для токена
   // DONE отправил запрос на url2 -> получил из хедеров токен DONE положил
